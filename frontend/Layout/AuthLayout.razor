@@ -1,0 +1,18 @@
+@inherits LayoutComponentBase
+
+<div class="min-h-screen flex items-center justify-center text-gray-100 transition-colors auth-background">
+    <div class="w-full max-w-md mx-auto">
+        <div class="bg-gray-800/90 backdrop-blur-sm rounded-lg shadow-xl p-8 border border-gray-700">
+            @Body
+        </div>
+    </div>
+</div>
+
+<style>
+    .auth-background {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+    }
+</style>

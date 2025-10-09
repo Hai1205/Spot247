@@ -1,0 +1,296 @@
+@page "/verify-email"
+@layout AuthLayout
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Nhập mã xác thực - Spot247</PageTitle>
+
+<div>
+    <h1 class="text-white text-2xl font-bold text-center mb-6">
+        Nhập mã xác thực
+    </h1>
+
+    <p class="text-gray-400 text-sm mb-2">
+        Chúng tôi đã gửi mã OTP về email của bạn, hãy nhập mã đó vào các ô bên
+        dưới để @(isPasswordReset ? "đặt lại mật khẩu" : "xác thực tài khoản").
+    </p>
+
+    <div class="text-center mb-6">
+        <p class="text-gray-300 text-sm">
+            Mã hết hạn trong: @FormatTime(timeLeft)
+        </p>
+    </div>
+
+    <EditForm Model="@verifyOtpRequest" OnValidSubmit="@HandleVerifyOtp">
+        <DataAnnotationsValidator />
+        
+        <div class="mb-6 space-y-6">
+            <div class="flex justify-between">
+                @for (int i = 0; i < 6; i++)
+                {
+                    var index = i; // Capture for closure
+                    <input 
+                        type="text" 
+                        @bind="otp[index]"
+                        @bind:event="oninput"
+                        @onkeydown="@(async (e) => await HandleKeyDown(index, e))"
+                        @onpaste="@(async (e) => await HandlePaste(e))"
+                        @ref="inputRefs[index]"
+                        class="@GetInputClass(index)"
+                        maxlength="1"
+                        disabled="@(isExpired || AuthService.IsLoading)" />
+                }
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="mb-4 p-3 bg-red-900/50 border border-red-700 rounded-md">
+                    <p class="text-red-300 text-sm">@errorMessage</p>
+                </div>
+            }
+
+            <ButtonComponent 
+                Type="submit"
+                Text="Xác thực"
+                LoadingText="Đang xác thực..."
+                IsLoading="@AuthService.IsLoading"
+                Disabled="@(AuthService.IsLoading || isExpired)"
+                CssClass="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed" />
+        </div>
+    </EditForm>
+
+    <div class="text-center">
+        <p class="text-gray-400 text-sm">
+            Không nhận được mã? 
+            <button 
+                @onclick="HandleResendOtp"
+                disabled="@(AuthService.IsLoading || timeLeft > 0)"
+                class="@(AuthService.IsLoading || timeLeft > 0 ? "text-gray-600 cursor-not-allowed" : "text-blue-400 hover:text-blue-300 cursor-pointer") underline">
+                Gửi lại mã
+            </button>
+        </p>
+    </div>
+</div>
+
+<ToastComponent @ref="toastComponent" />
+
+@code {
+    private VerifyOtpRequest verifyOtpRequest = new();
+    private string[] otp = new string[6];
+    private ElementReference[] inputRefs = new ElementReference[6];
+    private string errorMessage = string.Empty;
+    private ToastComponent? toastComponent;
+    
+    private string email = string.Empty;
+    private bool isPasswordReset = false;
+    private bool isExpired = false;
+    private int timeLeft = 300; // 5 minutes in seconds
+    private System.Threading.Timer? timer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Lấy parameters từ query string
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+        var queryStrings = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+        
+        if (queryStrings.TryGetValue("email", out var emailParam))
+        {
+            email = emailParam.ToString();
+            verifyOtpRequest.Username = email;
+        }
+        
+        if (queryStrings.TryGetValue("isPasswordReset", out var isResetParam))
+        {
+            bool.TryParse(isResetParam.ToString(), out isPasswordReset);
+        }
+
+        // Nếu đã đăng nhập, chuyển hướng đến trang chính
+        if (AuthService.IsAuthenticated && !isPasswordReset)
+        {
+            Navigation.NavigateTo("/");
+        }
+
+        AuthService.OnAuthStateChanged += StateHasChanged;
+        
+        // Bắt đầu timer đếm ngược
+        StartTimer();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Focus vào ô đầu tiên
+            await inputRefs[0].FocusAsync();
+        }
+    }
+
+    private void StartTimer()
+    {
+        timer = new System.Threading.Timer(async _ =>
+        {
+            if (timeLeft <= 0)
+            {
+                isExpired = true;
+                timer?.Dispose();
+            }
+            else
+            {
+                timeLeft--;
+            }
+            
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
+    }
+
+    private string FormatTime(int seconds)
+    {
+        var mins = seconds / 60;
+        var secs = seconds % 60;
+        return $"{mins}:{secs:D2}";
+    }
+
+    private string GetInputClass(int index)
+    {
+        var baseClass = "w-12 h-12 text-center text-xl font-bold bg-gray-700 text-white rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500";
+        
+        if (isExpired)
+            return baseClass + " border-red-500";
+            
+        return baseClass + " border border-gray-600";
+    }
+
+    private async Task HandleKeyDown(int index, KeyboardEventArgs e)
+    {
+        if (e.Key == "Backspace" && string.IsNullOrEmpty(otp[index]) && index > 0)
+        {
+            await inputRefs[index - 1].FocusAsync();
+        }
+        else if (e.Key.Length == 1 && char.IsDigit(e.Key[0]))
+        {
+            otp[index] = e.Key;
+            
+            if (index < 5)
+            {
+                await inputRefs[index + 1].FocusAsync();
+            }
+            
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandlePaste(ClipboardEventArgs e)
+    {
+        // Note: Paste handling in Blazor is limited, this is a simplified version
+        // In a real app, you might need to use JS interop for full paste functionality
+    }
+
+    private async Task HandleVerifyOtp()
+    {
+        errorMessage = string.Empty;
+
+        // Validate OTP
+        verifyOtpRequest.Otp = string.Join("", otp);
+        
+        if (verifyOtpRequest.Otp.Length != 6 || !verifyOtpRequest.Otp.All(char.IsDigit))
+        {
+            errorMessage = "Vui lòng nhập đầy đủ 6 số";
+            return;
+        }
+
+        if (isExpired)
+        {
+            errorMessage = "Mã OTP đã hết hạn";
+            return;
+        }
+
+        try
+        {
+            var result = await AuthService.VerifyOtpAsync(verifyOtpRequest);
+
+            if (result == null)
+            {
+                errorMessage = "Có lỗi xảy ra, vui lòng thử lại";
+                return;
+            }
+
+            if (result.StatusCode == 200)
+            {
+                // Xác thực thành công
+                if (toastComponent != null)
+                {
+                    if (isPasswordReset)
+                    {
+                        await toastComponent.ShowSuccess("Xác thực thành công!");
+                        await Task.Delay(1500);
+                        Navigation.NavigateTo($"/reset-password?email={Uri.EscapeDataString(email)}");
+                    }
+                    else
+                    {
+                        await toastComponent.ShowSuccess("Xác thực tài khoản thành công");
+                        await Task.Delay(1500);
+                        Navigation.NavigateTo("/login");
+                    }
+                }
+            }
+            else
+            {
+                errorMessage = result.Message;
+                // Clear OTP on error
+                otp = new string[6];
+                await inputRefs[0].FocusAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Có lỗi xảy ra, vui lòng thử lại";
+            Console.WriteLine($"Verify OTP error: {ex.Message}");
+            // Clear OTP on error
+            otp = new string[6];
+            await inputRefs[0].FocusAsync();
+        }
+    }
+
+    private async Task HandleResendOtp()
+    {
+        if (timeLeft > 0) return;
+
+        try
+        {
+            var result = await AuthService.SendOtpAsync(email);
+
+            if (result != null && result.StatusCode == 200)
+            {
+                if (toastComponent != null)
+                {
+                    await toastComponent.ShowSuccess("Mã OTP đã được gửi lại");
+                }
+                
+                // Reset timer
+                timeLeft = 300;
+                isExpired = false;
+                StartTimer();
+                
+                // Clear current OTP
+                otp = new string[6];
+                await inputRefs[0].FocusAsync();
+            }
+            else
+            {
+                errorMessage = result?.Message ?? "Không thể gửi lại mã OTP";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Có lỗi xảy ra khi gửi lại mã OTP";
+            Console.WriteLine($"Resend OTP error: {ex.Message}");
+        }
+    }
+
+    public void Dispose()
+    {
+        AuthService.OnAuthStateChanged -= StateHasChanged;
+        timer?.Dispose();
+    }
+}

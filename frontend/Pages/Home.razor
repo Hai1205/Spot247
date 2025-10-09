@@ -1,0 +1,79 @@
+@page "/"
+@layout MainLayout
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Trang chủ - Spot247</PageTitle>
+
+<div class="container mx-auto px-4 py-8">
+    @if (AuthService.IsAuthenticated)
+    {
+        <div class="max-w-4xl mx-auto">
+            <div class="bg-white rounded-lg shadow-lg p-8">
+                <h1 class="text-3xl font-bold text-gray-900 mb-6">
+                    Chào mừng, @AuthService.CurrentUser?.Username!
+                </h1>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-blue-50 p-6 rounded-lg">
+                        <h2 class="text-xl font-semibold text-blue-900 mb-3">Thông tin tài khoản</h2>
+                        <div class="space-y-2">
+                            <p><strong>Email:</strong> @AuthService.CurrentUser?.Username</p>
+                            <p><strong>Vai trò:</strong> @AuthService.CurrentUser?.Role</p>
+                            <p><strong>Ngày tạo:</strong> @AuthService.CurrentUser?.CreatedAt.ToString("dd/MM/yyyy")</p>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-green-50 p-6 rounded-lg">
+                        <h2 class="text-xl font-semibold text-green-900 mb-3">Hành động</h2>
+                        <div class="space-y-4">
+                            <button 
+                                @onclick="HandleLogout"
+                                class="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200">
+                                Đăng xuất
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="max-w-md mx-auto bg-white rounded-lg shadow-lg p-8 text-center">
+            <h1 class="text-2xl font-bold text-gray-900 mb-6">
+                Chào mừng đến với Spot247
+            </h1>
+            <p class="text-gray-600 mb-6">
+                Vui lòng đăng nhập để tiếp tục sử dụng dịch vụ.
+            </p>
+            <div class="space-y-4">
+                <a href="/login" 
+                   class="block w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-md transition-colors duration-200 text-center">
+                    Đăng nhập
+                </a>
+                <a href="/register" 
+                   class="block w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-4 rounded-md transition-colors duration-200 text-center">
+                    Đăng ký
+                </a>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        AuthService.OnAuthStateChanged += StateHasChanged;
+    }
+
+    private async Task HandleLogout()
+    {
+        await AuthService.LogoutAsync();
+    }
+
+    public void Dispose()
+    {
+        AuthService.OnAuthStateChanged -= StateHasChanged;
+    }
+}
