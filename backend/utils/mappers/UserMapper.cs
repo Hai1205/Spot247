@@ -8,9 +8,9 @@ public static class UserMapper
 
         return new UserDto
         {
-            Id = entity.Id.ToString(),
+            Id = entity.UserId.ToString(),
             Username = entity.Username,
-            Role = entity.Role.ToString(),
+            Role = entity.Role,
         };
     }
 
@@ -27,9 +27,9 @@ public static class UserMapper
 
         return new User
         {
-            Id = string.IsNullOrEmpty(dto.Id) ? Guid.NewGuid() : Guid.Parse(dto.Id),
+            UserId = string.IsNullOrEmpty(dto.Id) ? 0 : int.Parse(dto.Id),
             Username = dto.Username ?? null!,
-            Role = Enum.TryParse<UserRole>(dto.Role, out var role) ? role : UserRole.STAFF,
+            Role = dto.Role ?? "staff",
         };
     }
 

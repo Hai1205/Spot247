@@ -10,7 +10,7 @@ public class UserRepository(AppDbContext context)
     {
         try
         {
-            return await _context.User
+            return await _context.Users
                 .FirstOrDefaultAsync(c => c.Username == username);
         }
         catch (Exception ex)
@@ -23,7 +23,7 @@ public class UserRepository(AppDbContext context)
     {
         try
         {
-            await _context.User.AddAsync(user);
+            await _context.Users.AddAsync(user);
             await _context.SaveChangesAsync();
             return user;
         }
@@ -37,7 +37,7 @@ public class UserRepository(AppDbContext context)
     {
         try
         {
-            _context.User.Update(user);
+            _context.Users.Update(user);
             await _context.SaveChangesAsync();
             return user;
         }

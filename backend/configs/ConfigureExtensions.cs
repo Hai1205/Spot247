@@ -58,8 +58,9 @@ public class ConfigureExtensions
 
     private static void ConfigureDbContext(WebApplicationBuilder builder)
     {
+        var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
         builder.Services.AddDbContext<AppDbContext>(options =>
-            options.UseMySql(Variable.Enviroments.MYSQL_URI, ServerVersion.AutoDetect(Variable.Enviroments.MYSQL_URI))
+            options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString))
         );
     }
 

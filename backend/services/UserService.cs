@@ -16,7 +16,7 @@ public class UserService(UserRepository userRepository)
         {
             Username = username,
             Password = hashedPassword,
-            Role = role != null ? Enum.Parse<UserRole>(role) : UserRole.STAFF,
+            Role = role ?? "staff",
         };
 
         return await _userRepository.HandleCreateUser(newUser);
